@@ -74,6 +74,7 @@ def main(args):
     U.make_session(num_cpu=1).__enter__()
     set_global_seeds(args.seed)
     env = gym.make(args.env_id)
+    logger.configure()
 
     env = bench.Monitor(env, logger.get_dir() and
                         osp.join(logger.get_dir(), "monitor.json"))
@@ -108,10 +109,13 @@ def main(args):
               task_name
               )
     elif args.task == 'evaluate':
+        from baselines.trpo_mpi import trpo_mpi as original_trpo
         from baselines.ppo1.mlp_policy import MlpPolicy as OriginalMlpPolicy
         def policy_fn(name, ob_space, ac_space, reuse=False):
             return OriginalMlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                                     hid_size=args.policy_hidden_size, num_hid_layers=2)
+        original_trpo.learn(env, policy_fn, timesteps_per_batch=1024, max_kl=0.01, cg_iters=10, cg_damping=0.1,
+            max_timesteps=args.num_timesteps, gamma=0.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
         runner(env,
                policy_fn,
                args.load_model_path,
@@ -182,8 +186,9 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
     U.initialize()
     # Prepare for rollouts
     # ----------------------------------------
-    saver = tf.train.Saver()
-    saver.restore(tf.get_default_session(), load_model_path)
+    if load_model_path:
+        saver = tf.train.Saver()
+        saver.restore(tf.get_default_session(), load_model_path)
 
     obs_list = []
     acs_list = []
