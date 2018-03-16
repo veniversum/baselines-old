@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 import numpy as np
 import gym
+import tensorflow as tf
 
 from baselines.gail import mlp_policy
 from baselines.common import set_global_seeds, tf_util as U
@@ -165,7 +166,8 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
     U.initialize()
     # Prepare for rollouts
     # ----------------------------------------
-    U.load_state(load_model_path)
+    saver = tf.train.Saver()
+    saver.restore(tf.get_default_session(), load_model_path)
 
     obs_list = []
     acs_list = []
