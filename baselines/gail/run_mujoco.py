@@ -12,7 +12,6 @@ import numpy as np
 import gym
 import tensorflow as tf
 
-from baselines.gail import mlp_policy
 from baselines.common import set_global_seeds, tf_util as U
 from baselines.common.misc_util import boolean_flag
 from baselines import bench
@@ -76,9 +75,6 @@ def main(args):
     set_global_seeds(args.seed)
     env = gym.make(args.env_id)
 
-    def policy_fn(name, ob_space, ac_space, reuse=False):
-        return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                                    reuse=reuse, hid_size=args.policy_hidden_size, num_hid_layers=2)
     env = bench.Monitor(env, logger.get_dir() and
                         osp.join(logger.get_dir(), "monitor.json"))
     env.seed(args.seed)
@@ -88,6 +84,10 @@ def main(args):
     args.log_dir = osp.join(args.log_dir, task_name)
 
     if args.task == 'train':
+        from baselines.gail import mlp_policy
+        def policy_fn(name, ob_space, ac_space, reuse=False):
+          return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                                      reuse=reuse, hid_size=args.policy_hidden_size, num_hid_layers=2)
         dataset = Mujoco_Dset(expert_path=args.expert_path, traj_limitation=args.traj_limitation)
         reward_giver = TransitionClassifier(env, args.adversary_hidden_size, entcoeff=args.adversary_entcoeff)
         train(env,
@@ -108,6 +108,10 @@ def main(args):
               task_name
               )
     elif args.task == 'evaluate':
+        from baselines.ppo1.mlp_policy import MlpPolicy as OriginalMlpPolicy
+        def policy_fn(name, ob_space, ac_space, reuse=False):
+            return OriginalMlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                                    hid_size=args.policy_hidden_size, num_hid_layers=2)
         runner(env,
                policy_fn,
                args.load_model_path,
@@ -118,6 +122,10 @@ def main(args):
                )
     elif args.task == 'expert':
         from baselines.trpo_mpi import trpo_mpi as original_trpo
+        from baselines.ppo1.mlp_policy import MlpPolicy as OriginalMlpPolicy
+        def policy_fn(name, ob_space, ac_space, reuse=False):
+            return OriginalMlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                                    hid_size=args.policy_hidden_size, num_hid_layers=2)
         original_trpo.learn(env, policy_fn, timesteps_per_batch=1024, max_kl=0.01, cg_iters=10, cg_damping=0.1,
             max_timesteps=args.num_timesteps, gamma=0.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
         saver = tf.train.Saver()
@@ -180,10 +188,11 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
     obs_list = []
     acs_list = []
     len_list = []
+    rew_list = []
     ret_list = []
     for _ in tqdm(range(number_trajs)):
         traj = traj_1_generator(pi, env, timesteps_per_batch, stochastic=stochastic_policy)
-        obs, acs, ep_len, ep_ret = traj['ob'], traj['ac'], traj['ep_len'], traj['ep_ret']
+        obs, acs, ep_len, ep_ret, rew = traj['ob'], traj['ac'], traj['ep_len'], traj['ep_ret'], traj['rew']
         obs_list.append(obs)
         acs_list.append(acs)
         len_list.append(ep_len)
@@ -194,8 +203,8 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
         print('deterministic policy:')
     if save:
         filename = load_model_path.split('/')[-1] + '.' + env.spec.id
-        np.savez(filename, obs=np.array(obs_list), acs=np.array(acs_list),
-                 lens=np.array(len_list), rets=np.array(ret_list))
+        np.savez(filename, obs=np.array(obs_list), acs=np.array(acs_list), rews=np.array(rew_list),
+                 lens=np.array(len_list), ep_rets=np.array(ret_list))
     avg_len = sum(len_list)/len(len_list)
     avg_ret = sum(ret_list)/len(ret_list)
     print("Average length:", avg_len)

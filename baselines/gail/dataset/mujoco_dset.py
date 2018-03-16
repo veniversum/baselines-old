@@ -62,8 +62,8 @@ class Mujoco_Dset(object):
         self.rets = traj_data['ep_rets'][:traj_limitation]
         self.avg_ret = sum(self.rets)/len(self.rets)
         self.std_ret = np.std(np.array(self.rets))
-        if len(self.acs) > 2:
-            self.acs = np.squeeze(self.acs)
+        # if len(self.acs) > 2:
+        #     self.acs = np.squeeze(self.acs)
         assert len(self.obs) == len(self.acs)
         self.num_traj = min(traj_limitation, len(traj_data['obs']))
         self.num_transition = len(self.obs)
