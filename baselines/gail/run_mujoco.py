@@ -119,7 +119,7 @@ def main(args):
     elif args.task == 'expert':
         from baselines.trpo_mpi import trpo_mpi as original_trpo
         original_trpo.learn(env, policy_fn, timesteps_per_batch=1024, max_kl=0.01, cg_iters=10, cg_damping=0.1,
-            max_timesteps=args.num_timesteps, gamma=0.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3)
+            max_timesteps=args.num_timesteps, gamma=0.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
         saver = tf.train.Saver()
         saver.save(tf.get_default_session(), args.save_model_path)
     else:
