@@ -30,10 +30,12 @@ def argsparser():
     parser.add_argument('--log_dir', help='the directory to save log file', default='log')
     parser.add_argument('--load_model_path', help='if provided, load the model', type=str, default=None)
     # Task
-    parser.add_argument('--task', type=str, choices=['train', 'evaluate', 'sample'], default='train')
+    parser.add_argument('--task', type=str, choices=['train', 'evaluate', 'sample', 'expert'], default='train')
     # for evaluatation
     boolean_flag(parser, 'stochastic_policy', default=False, help='use stochastic/deterministic policy to evaluate')
     boolean_flag(parser, 'save_sample', default=False, help='save the trajectories or not')
+    # for expert training
+    parser.add_argument('--save_model_path', help='if provided, load the model', type=str, default=None)
     #  Mujoco Dataset Configuration
     parser.add_argument('--traj_limitation', type=int, default=-1)
     # Optimization Configuration
@@ -114,6 +116,12 @@ def main(args):
                stochastic_policy=args.stochastic_policy,
                save=args.save_sample
                )
+    elif args.task == 'expert':
+        from baselines.trpo_mpi import trpo_mpi as original_trpo
+        original_trpo.learn(env, policy_fn, timesteps_per_batch=1024, max_kl=0.01, cg_iters=10, cg_damping=0.1,
+            max_timesteps=args.num_timesteps, gamma=0.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3)
+        saver = tf.train.Saver()
+        saver.save(tf.get_default_session(), args.save_model_path)
     else:
         raise NotImplementedError
     env.close()
