@@ -17,7 +17,7 @@ from baselines.common.misc_util import boolean_flag
 from baselines import bench
 from baselines import logger
 from baselines.gail.dataset.mujoco_dset import Mujoco_Dset
-from baselines.gail.adversary import TransitionClassifier
+from baselines.gail.adversary import TransitionClassifier, WeakTransitionClassifier
 
 
 def argsparser():
@@ -37,6 +37,7 @@ def argsparser():
     parser.add_argument('--save_model_path', help='if provided, load the model', type=str, default=None)
     #  Mujoco Dataset Configuration
     parser.add_argument('--traj_limitation', type=int, default=-1)
+    boolean_flag(parser, 'states_only', default=False, help='only use states and not actions')
     # Optimization Configuration
     parser.add_argument('--g_step', help='number of steps to train policy in each epoch', type=int, default=3)
     parser.add_argument('--d_step', help='number of steps to train discriminator in each epoch', type=int, default=1)
@@ -90,7 +91,10 @@ def main(args):
           return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                                       reuse=reuse, hid_size=args.policy_hidden_size, num_hid_layers=2)
         dataset = Mujoco_Dset(expert_path=args.expert_path, traj_limitation=args.traj_limitation)
-        reward_giver = TransitionClassifier(env, args.adversary_hidden_size, entcoeff=args.adversary_entcoeff)
+        if args.states_only:
+            reward_giver = WeakTransitionClassifier(env, args.adversary_hidden_size, entcoeff=args.adversary_entcoeff)
+        else:
+            reward_giver = TransitionClassifier(env, args.adversary_hidden_size, entcoeff=args.adversary_entcoeff)
         train(env,
               args.seed,
               policy_fn,
