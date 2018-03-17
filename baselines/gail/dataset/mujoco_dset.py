@@ -49,12 +49,17 @@ class Mujoco_Dset(object):
 
         def flatten(x):
             # x.shape = (E,), or (E, L, D)
-            _, size = x[0].shape
+            newaxis = False
+            if len(x[0].shape) < 2:
+                size = 1
+                newaxis = True
+            else:
+                _, size = x[0].shape
             episode_length = [len(i) for i in x]
             y = np.zeros((sum(episode_length), size))
             start_idx = 0
             for l, x_i in zip(episode_length, x):
-                y[start_idx:(start_idx+l)] = x_i
+                y[start_idx:(start_idx+l)] = x_i[:, None] if newaxis else x_i
                 start_idx += l
                 return y
         self.obs = np.array(flatten(obs))
