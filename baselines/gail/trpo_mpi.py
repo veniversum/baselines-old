@@ -110,7 +110,7 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
           max_kl, cg_iters, cg_damping=1e-2,
           vf_stepsize=3e-4, d_stepsize=3e-4, vf_iters=3,
           max_timesteps=0, max_episodes=0, max_iters=0,
-          callback=None
+          callback=None, states_only=False
           ):
 
     nworkers = MPI.COMM_WORLD.Get_size()
@@ -324,7 +324,10 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
             ob_expert, ac_expert = expert_dataset.get_next_batch(len(ob_batch))
             # update running mean/std for reward_giver
             if hasattr(reward_giver, "obs_rms"): reward_giver.obs_rms.update(np.concatenate((ob_batch, ob_expert), 0))
-            *newlosses, g = reward_giver.lossandgrad(ob_batch, ac_batch, ob_expert, ac_expert)
+            if states_only:
+                *newlosses, g = reward_giver.lossandgrad(ob_batch, ac_batch, ob_expert, ac_expert)
+            else:
+                *newlosses, g = reward_giver.lossandgrad(ob_batch, ob_expert)
             d_adam.update(allmean(g), d_stepsize)
             d_losses.append(newlosses)
         logger.log(fmt_row(13, np.mean(d_losses, axis=0)))
