@@ -29,7 +29,7 @@ def argsparser():
     parser.add_argument('--log_dir', help='the directory to save log file', default='log')
     parser.add_argument('--load_model_path', help='if provided, load the model', type=str, default=None)
     # Task
-    parser.add_argument('--task', type=str, choices=['train', 'evaluate', 'sample', 'expert'], default='train')
+    parser.add_argument('--task', type=str, choices=['train', 'evaluate', 'sample', 'expert_train', 'expert_gen'], default='train')
     # for evaluatation
     boolean_flag(parser, 'stochastic_policy', default=False, help='use stochastic/deterministic policy to evaluate')
     boolean_flag(parser, 'save_sample', default=False, help='save the trajectories or not')
@@ -121,7 +121,7 @@ def main(args):
                stochastic_policy=args.stochastic_policy,
                save=args.save_sample
                )
-    elif args.task == 'expert':
+    elif args.task == 'expert_train':
         from baselines.trpo_mpi import trpo_mpi as original_trpo
         from baselines.ppo1.mlp_policy import MlpPolicy as OriginalMlpPolicy
         def policy_fn(name, ob_space, ac_space, reuse=False):
@@ -131,6 +131,20 @@ def main(args):
             max_timesteps=args.num_timesteps, gamma=0.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
         saver = tf.train.Saver()
         saver.save(tf.get_default_session(), args.save_model_path)
+    elif args.task == 'expert_gen':
+        from baselines.trpo_mpi import trpo_mpi as original_trpo
+        from baselines.ppo1.mlp_policy import MlpPolicy as OriginalMlpPolicy
+        def policy_fn(name, ob_space, ac_space, reuse=False):
+            return OriginalMlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                                    hid_size=args.policy_hidden_size, num_hid_layers=2)
+        runner(env,
+               policy_fn,
+               args.save_model_path,
+               timesteps_per_batch=1024,
+               number_trajs=args.traj_limitation,
+               stochastic_policy=args.stochastic_policy,
+               save=args.save_sample
+                              )
     else:
         raise NotImplementedError
     env.close()
@@ -184,7 +198,7 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
     # Prepare for rollouts
     # ----------------------------------------
     if load_model_path:
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(var_list=pi.get_variables())
         saver.restore(tf.get_default_session(), load_model_path)
 
     obs_list = []
