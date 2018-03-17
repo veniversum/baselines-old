@@ -114,8 +114,9 @@ def main(args):
         def policy_fn(name, ob_space, ac_space, reuse=False):
             return OriginalMlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                                     hid_size=args.policy_hidden_size, num_hid_layers=2)
-        original_trpo.learn(env, policy_fn, timesteps_per_batch=1024, max_kl=0.01, cg_iters=10, cg_damping=0.1,
-            max_timesteps=args.num_timesteps, gamma=0.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
+        if args.load_model_path is None:
+            original_trpo.learn(env, policy_fn, timesteps_per_batch=1024, max_kl=0.01, cg_iters=10, cg_damping=0.1,
+                max_timesteps=args.num_timesteps, gamma=0.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
         runner(env,
                policy_fn,
                args.load_model_path,
