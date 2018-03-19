@@ -34,17 +34,18 @@ def argsparser():
     parser = argparse.ArgumentParser('Do evaluation')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--policy_hidden_size', type=int, default=100)
+    parser.add_argument('--checkpoint_dir', type=str, default='checkpoint')
     parser.add_argument('--env', type=str, choices=['Hopper', 'Walker2d', 'HalfCheetah',
                                                     'Humanoid', 'HumanoidStandup'])
     boolean_flag(parser, 'stochastic_policy', default=False, help='use stochastic/deterministic policy to evaluate')
     return parser.parse_args()
 
 
-def evaluate_env(env_name, seed, policy_hidden_size, stochastic, reuse, prefix):
+def evaluate_env(env_name, seed, policy_hidden_size, stochastic, reuse, prefix, chkpt_dir):
 
     def get_checkpoint_dir(checkpoint_list, limit, prefix):
         for checkpoint in checkpoint_list:
-            if ('limitation_'+str(limit) in checkpoint) and (prefix in checkpoint):
+            if ('limitation_'+str(limit)+'.' in checkpoint) and (prefix in checkpoint):
                 return checkpoint
         return None
 
@@ -54,7 +55,7 @@ def evaluate_env(env_name, seed, policy_hidden_size, stochastic, reuse, prefix):
 
     data_path = os.path.join('data', 'deterministic.trpo.' + env_name + '.0.00.npz')
     dataset = load_dataset(data_path)
-    checkpoint_list = glob.glob(os.path.join('checkpoint', '*' + env_name + ".*"))
+    checkpoint_list = glob.glob(os.path.join(chkpt_dir, '*' + env_name + ".*"))
     log = {
         'traj_limitation': [],
         'upper_bound': [],
@@ -62,12 +63,16 @@ def evaluate_env(env_name, seed, policy_hidden_size, stochastic, reuse, prefix):
         'avg_len': [],
         'normalized_ret': []
     }
+    import numpy as np
     for i, limit in enumerate(CONFIG['traj_limitation']):
         # Do one evaluation
+        from baselines import logger
+        logger.configure('/tmp/%s_%d/' % (env_name, limit))
         upper_bound = sum(dataset.rets[:limit])/limit
+        upper_std = np.std(dataset.rets[:limit])
         checkpoint_dir = get_checkpoint_dir(checkpoint_list, limit, prefix=prefix)
         checkpoint_path = tf.train.latest_checkpoint(checkpoint_dir)
-        env = gym.make(env_name + '-v1')
+        env = gym.make(env_name + '-v2')
         env.seed(seed)
         print('Trajectory limitation: {}, Load checkpoint: {}, '.format(limit, checkpoint_path))
         avg_len, avg_ret = run_mujoco.runner(env,
@@ -78,8 +83,8 @@ def evaluate_env(env_name, seed, policy_hidden_size, stochastic, reuse, prefix):
                                              stochastic_policy=stochastic,
                                              reuse=((i != 0) or reuse))
         normalized_ret = avg_ret/upper_bound
-        print('Upper bound: {}, evaluation returns: {}, normalized scores: {}'.format(
-            upper_bound, avg_ret, normalized_ret))
+        print('Upper bound: {}, Upper std: {},  evaluation returns: {}, normalized scores: {}'.format(
+            upper_bound, upper_std, avg_ret, normalized_ret))
         log['traj_limitation'].append(limit)
         log['upper_bound'].append(upper_bound)
         log['avg_ret'].append(avg_ret)
@@ -131,15 +136,15 @@ def main(args):
     U.make_session(num_cpu=1).__enter__()
     set_global_seeds(args.seed)
     print('Evaluating {}'.format(args.env))
-    bc_log = evaluate_env(args.env, args.seed, args.policy_hidden_size,
-                          args.stochastic_policy, False, 'BC')
+    so_log = evaluate_env(args.env, args.seed, args.policy_hidden_size,
+                          args.stochastic_policy, False, 'trpo_gail', 'chkpt')
     print('Evaluation for {}'.format(args.env))
-    print(bc_log)
+    print(so_log)
     gail_log = evaluate_env(args.env, args.seed, args.policy_hidden_size,
-                            args.stochastic_policy, True, 'gail')
+                            args.stochastic_policy, True, 'trpo_gail', args.checkpoint_dir)
     print('Evaluation for {}'.format(args.env))
     print(gail_log)
-    plot(args.env, bc_log, gail_log, args.stochastic_policy)
+    #plot(args.env, so_log, gail_log, args.stochastic_policy)
 
 
 if __name__ == '__main__':
