@@ -1,0 +1,2 @@
+model_checkpoint_path: "BC.Humanoid.traj_limitation_10.seed_0"
+all_model_checkpoint_paths: "BC.Humanoid.traj_limitation_10.seed_0"

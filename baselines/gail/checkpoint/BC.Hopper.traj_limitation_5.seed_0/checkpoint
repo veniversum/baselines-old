@@ -1,0 +1,2 @@
+model_checkpoint_path: "BC.Hopper.traj_limitation_5.seed_0"
+all_model_checkpoint_paths: "BC.Hopper.traj_limitation_5.seed_0"
